@@ -259,4 +259,87 @@ namespace WindowsFormsApp3
 
     }
 }
+
+using (var db = new AppContext())
+{
+    // Создаем новый объект для добавления
+    var newProduct = new products
+    {
+        name = "Новый продукт",
+        price = 100.50m,
+        // другие свойства...
+    };
+
+    // Добавляем объект в DbSet
+    db.products_Import.Add(newProduct);
+
+    // Сохраняем изменения в БД
+    db.SaveChanges();
+
+    Console.WriteLine($"Добавлен продукт с ID: {newProduct.id}");
+}
+
+using (var db = new AppContext())
+{
+    // 1. Находим запись для изменения
+    var productToUpdate = db.products_Import.FirstOrDefault(p => p.id == 1);
+    
+    if (productToUpdate != null)
+    {
+        // 2. Изменяем свойства объекта
+        productToUpdate.name = "Новое название продукта";
+        productToUpdate.price = 150.99m;
+        
+        // 3. Сохраняем изменения
+        db.SaveChanges();
+        
+        Console.WriteLine("Запись успешно обновлена");
+    }
+    else
+    {
+        Console.WriteLine("Продукт с указанным ID не найден");
+    }
+}
+
+using (var db = new AppContext())
+{
+    var materialType = db.material_Type_Imports.Find(1); // Поиск по первичному ключу
+    if (materialType != null)
+    {
+        materialType.name = "Обновленное название типа";
+        materialType.description = "Обновленное описание";
+        db.SaveChanges();
+    }
+}
+
+using (var db = new AppContext())
+{
+    // 1. Находим запись для удаления
+    var productToDelete = db.products_Import.FirstOrDefault(p => p.id == 1);
+    
+    if (productToDelete != null)
+    {
+        // 2. Удаляем объект из DbSet
+        db.products_Import.Remove(productToDelete);
+        
+        // 3. Сохраняем изменения
+        db.SaveChanges();
+        
+        Console.WriteLine("Запись успешно удалена");
+    }
+    else
+    {
+        Console.WriteLine("Продукт с указанным ID не найден");
+    }
+}
+
+using (var db = new AppContext())
+{
+    var materialType = db.material_Type_Imports.Find(1); // Поиск по первичному ключу
+    if (materialType != null)
+    {
+        db.material_Type_Imports.Remove(materialType);
+        db.SaveChanges();
+    }
+}
 -->
