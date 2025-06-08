@@ -1,0 +1,260 @@
+    using System.Data.Entity;
+  
+    internal class AppContext : DbContext
+    {
+        public AppContext() : base("name=demoEntities") { }
+        public DbSet<material_type> material_Type_Imports { get; set; }
+        public DbSet<partners> partners_Import { get; set; }
+        public DbSet<partner_product> partners_products_Import { get; set; }
+        public DbSet<partners_type> partner_Type { get; set; }
+        public DbSet<product_type> product_Type_Import { get; set; }
+        public DbSet<products> products_Import { get; set; }
+    }
+
+    public partial class UserControl1 : UserControl
+    {
+        public int PartnerId { get; private set; }
+        public event Action<int> OnEditRequested;
+
+        public UserControl1()
+        {
+            InitializeComponent();
+            this.Click += UserControl_Click;
+            foreach (Control ctl in this.Controls)
+                ctl.Click += UserControl_Click;
+        }
+
+        public void DataSet(int partnerId, string type, string name, int discount, string director, string phone, byte rating)
+        {
+            PartnerId = partnerId;
+            label1.Text = type + " | " + name;
+            label2.Text = "+7" + phone;
+            label3.Text = director;
+            label4.Text = discount + "%";
+            label5.Text = "Рейтинг: " + rating;
+        }
+
+        private void UserControl_Click(object sender, EventArgs e)
+        {
+            OnEditRequested?.Invoke(PartnerId);
+        }
+    }
+
+    using static System.Windows.Forms.VisualStyles.VisualStyleElement;
+
+
+namespace WindowsFormsApp3
+{
+    public partial class Edit : Form
+    {
+        private readonly AppContext appContext = new AppContext();
+        private Partners_import partnerToEdit;
+        private readonly Form1 mainForm;
+
+        public Edit(Form1 form)
+        {
+            InitializeComponent();
+            mainForm = form;
+            LoadPartnerTypes();
+            this.Text = "Добавление партнёра";
+            button1.Text = "Добавить запись";
+        }
+
+        public Edit(Form1 form, Partners_import partner) : this(form)
+        {
+            partnerToEdit = partner;
+
+            if (partner != null)
+            {
+                textBox1.Text = partner.partner;
+                comboBox1.SelectedValue = partner.partner_type_id;
+                textBox3.Text = partner.rating.ToString();
+                textBox4.Text = partner.adress;
+                textBox5.Text = partner.director;
+                textBox6.Text = partner.phone;
+                textBox7.Text = partner.email;
+
+                this.Text = "Редактирование партнёра";
+                button1.Text = "Изменить запись";
+            }
+        }
+
+        private void button1_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(textBox1.Text) ||
+                    comboBox1.SelectedValue == null ||
+                    string.IsNullOrWhiteSpace(textBox4.Text) ||
+                    string.IsNullOrWhiteSpace(textBox5.Text))
+                {
+                    MessageBox.Show("Заполните все обязательные поля!", "Ошибка",
+                                   MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                if (!byte.TryParse(textBox3.Text, out byte rate))
+                {
+                    MessageBox.Show("Рейтинг должен быть целым неотрицательным числом от 0 до 255!", "Ошибка",
+                                   MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                if (partnerToEdit == null)
+                {
+                    // Добавление
+                    byte newId = 1;
+
+                    if (appContext.partners_Import.Any())
+                    {
+                        newId = (byte)(appContext.partners_Import.Max(p => p.id) + 1);
+                    }
+                    var newPartner = new Partners_import
+                    {
+                        id = newId,
+                        partner = textBox1.Text,
+                        partner_type_id = Convert.ToByte(comboBox1.SelectedValue),
+                        rating = rate,
+                        adress = textBox4.Text,
+                        director = textBox5.Text,
+                        phone = textBox6.Text,
+                        email = textBox7.Text
+                    };
+
+                    appContext.partners_Import.Add(newPartner);
+                }
+                else
+                {
+                    // Редактирование
+                    var existingPartner = appContext.partners_Import
+                        .FirstOrDefault(p => p.id == partnerToEdit.id);
+
+                    if (existingPartner == null)
+                    {
+                        MessageBox.Show("Партнёр не найден для редактирования.", "Ошибка",
+                                       MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        return;
+                    }
+
+                    existingPartner.partner = textBox1.Text;
+                    existingPartner.partner_type_id = Convert.ToByte(comboBox1.SelectedValue);
+                    existingPartner.rating = rate;
+                    existingPartner.adress = textBox4.Text;
+                    existingPartner.director = textBox5.Text;
+                    existingPartner.phone = textBox6.Text;
+                    existingPartner.email = textBox7.Text;
+                }
+                MessageBox.Show($"Выбранный тип партнёра ID: {comboBox1.SelectedValue}");
+                appContext.SaveChanges();
+                MessageBox.Show("Партнёр успешно сохранён!", "Успех",
+                               MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+                this.DialogResult = DialogResult.OK;
+                this.Close();
+            }
+            catch (Exception ex)
+            {
+                string deepMessage = ex.InnerException?.InnerException?.Message
+                                     ?? ex.InnerException?.Message
+                                     ?? ex.Message;
+
+                MessageBox.Show($"Ошибка при сохранении:\n{deepMessage}",
+                                "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+
+
+        }
+
+        private void button2_Click(object sender, EventArgs e)
+        {
+            this.Close(); 
+            var main = new Form1();
+            main.Show();
+        }
+
+        private void LoadPartnerTypes()
+        {
+            try
+            {
+                var partnerTypes = appContext.partner_Type
+                                       .OrderBy(t => t.type)
+                                       .ToList();
+
+                comboBox1.DataSource = partnerTypes;
+                comboBox1.DisplayMember = "type";
+                comboBox1.ValueMember = "id";
+                comboBox1.SelectedIndex = -1;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка при загрузке типов партнеров: {ex.Message}",
+                               "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+    }
+
+}
+
+
+namespace WindowsFormsApp3
+{
+    public partial class Form1 : Form
+    {
+        private AppContext appContext = new AppContext();
+        public Form1()
+        {
+            InitializeComponent();
+            LoadPartners();
+        }
+
+        private void LoadPartners()
+        {
+            using (var freshContext = new AppContext())
+            {
+                flowLayoutPanel1.Controls.Clear();
+
+                var partners = freshContext.partners_Import.ToList();
+
+                foreach (var partner in partners)
+                {
+                    var total = freshContext.partners_products_Import
+                        .Where(r => r.partner_id == partner.id)
+                        .Sum(r => (int?)r.prod_ammount) ?? 0;
+
+                    int discount = total >= 100000 ? 5 : total >= 50000 ? 10 : total >= 30000 ? 15 : 0;
+                    var type = freshContext.partner_Type
+                        .FirstOrDefault(t => t.id == partner.partner_type_id)?.type ?? "Неизвестный тип";
+
+                    var uc = new UserControl1();
+                    uc.DataSet(partner.id, type, partner.partner, discount, partner.director, partner.phone, partner.rating);
+                    uc.OnEditRequested += OpenEditForm;
+                    flowLayoutPanel1.Controls.Add(uc);
+                }
+            }
+        }
+
+        private void OpenEditForm(int partnerId)
+        {
+            var partner = appContext.partners_Import.FirstOrDefault(p => p.id == partnerId);
+            if (partner != null)
+            {
+                var editForm = new Edit(this, partner);
+                if (editForm.ShowDialog() == DialogResult.OK)
+                {
+                    LoadPartners();
+                }
+            }
+        }
+
+        private void add_btn_Click(object sender, EventArgs e)
+        {
+            var addForm = new Edit(this);
+            if (addForm.ShowDialog() == DialogResult.OK)
+            {
+                LoadPartners();
+            }
+        }
+
+    }
+}
+
